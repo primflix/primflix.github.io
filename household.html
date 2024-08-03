@@ -1,0 +1,205 @@
+<!DOCTYPE html>
+<html lang="en" class="bg-black">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Netflix Household Verify</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'netflix-red': '#E50914',
+                        'netflix-black': '#00000',
+                    },
+                },
+            },
+        }
+    </script>
+</head>
+
+<body class="text-gray-100 bg-black min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-8">
+            <img src="https://upload.wikimedia.org/wikipedia/commons/0/08/Netflix_2015_logo.svg" alt="Netflix"
+                class="w-24">
+            <a href="index.html" class="text-gray-400 hover:text-white transition-colors">
+                <i class="fas fa-home text-2xl"></i>
+            </a>
+        </div>
+
+        <div class="max-w-md mx-auto bg-netflix-black rounded-lg shadow-2xl p-6">
+            <h1 id="household-verify" class="text-3xl font-bold mb-6 text-center">Household Verify</h1>
+
+            <div class="mb-4">
+                <label for="email" class="block mb-2 text-sm font-medium">Email Address</label>
+                <input type="email" id="email"
+                    class="w-full p-3 bg-gray-800 rounded-md focus:ring-2 focus:ring-netflix-red focus:outline-none"
+                    required>
+            </div>
+
+            <div class="mb-4">
+                <label for="option" class="block mb-2 text-sm font-medium">Store name</label>
+                <select id="option"
+                    class="w-full p-3 bg-gray-800 rounded-md focus:ring-2 focus:ring-netflix-red focus:outline-none">
+                    <option value="KLYD">KLYD</option>
+                </select>
+            </div>
+
+            <button id="checkEmail"
+                class="w-full bg-netflix-red text-white p-3 rounded-md hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50 text-lg font-semibold">
+                Check Email
+            </button>
+
+            <div id="emailResults" class="mt-8 space-y-4"></div>
+        </div>
+    </div>
+
+    <div id="loadingOverlay" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+        <div class="animate-spin rounded-full h-16 w-16 border-b-2 border-netflix-red"></div>
+    </div>
+
+    <div id="alertContainer" class="fixed top-0 left-0 right-0 flex justify-center items-start p-4 z-50 hidden">
+        <div id="alert" class="bg-red-500 text-white px-6 py-4 rounded-md shadow-lg">
+            <p id="alertMessage"></p>
+        </div>
+    </div>
+
+    <script>
+        const options = {
+            KLYD: {
+                csrf: '463f58a93ff4acc9d1901baaa9c0edf3',
+                shash: 'SHASH%3Aa77bd760d1dfb1c7f22f79d64b746946'
+            },
+            Keylinnn: {
+                csrf: 'your_csrf_token_here',
+                shash: 'your_shash_here'
+            }
+        };
+
+        function showLoading(show) {
+            const loader = document.getElementById('loadingOverlay');
+            loader.classList.toggle('hidden', !show);
+        }
+
+        function showAlert(message) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertMessage = document.getElementById('alertMessage');
+            alertMessage.textContent = message;
+            alertContainer.classList.remove('hidden');
+            setTimeout(() => {
+                alertContainer.classList.add('hidden');
+            }, 5000);
+        }
+
+        function displayEmail(email) {
+            const emailDiv = document.createElement('div');
+            emailDiv.className = 'bg-gray-800 p-4 rounded-md transition-all duration-300 ease-in-out';
+            emailDiv.innerHTML = `
+        <div class="flex justify-between items-center">
+            <h3 class="font-bold text-lg">${email.title}</h3>
+            <button class="toggle-content text-netflix-red hover:text-red-400 transition-colors focus:outline-none">
+                <i class="fas fa-chevron-down"></i>
+            </button>
+        </div>
+        <p class="text-sm text-gray-400 mb-2">From: ${email.sender}</p>
+        <div class="email-content hidden overflow-hidden transition-all duration-300 ease-in-out">
+            <div class="bg-gray-700 p-3 rounded-md mt-2 text-sm overflow-x-auto">
+                ${sanitizeEmailContent(email.content)}
+            </div>
+        </div>
+    `;
+
+            const toggleButton = emailDiv.querySelector('.toggle-content');
+            const contentDiv = emailDiv.querySelector('.email-content');
+            const icon = toggleButton.querySelector('i');
+
+            toggleButton.addEventListener('click', () => {
+                contentDiv.classList.toggle('hidden');
+                icon.classList.toggle('fa-chevron-down');
+                icon.classList.toggle('fa-chevron-up');
+            });
+
+            return emailDiv;
+        }
+
+        function sanitizeEmailContent(content) {
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = content;
+
+            const unwantedElements = tempDiv.querySelectorAll('.print_none, .cautionbox, .footer-shell.content-padding');
+            unwantedElements.forEach(element => element.remove());
+
+            const tables = tempDiv.querySelectorAll('table');
+            tables.forEach(table => {
+                table.removeAttribute('width');
+                table.removeAttribute('style');
+                table.classList.add('w-full');
+            });
+
+            const images = tempDiv.querySelectorAll('img');
+            images.forEach(img => {
+                img.classList.add('max-w-full', 'h-auto');
+                img.removeAttribute('width');
+                img.removeAttribute('height');
+            });
+
+            return tempDiv.innerHTML;
+        }
+
+        document.getElementById('checkEmail').addEventListener('click', async function () {
+            const email = document.getElementById('email').value;
+            const selectedOption = document.getElementById('option').value;
+            const { csrf, shash } = options[selectedOption];
+            const resultsDiv = document.getElementById('emailResults');
+
+            resultsDiv.innerHTML = '';
+            showLoading(true);
+
+            try {
+                const response = await axios.post('https://mighty-everglades-60415-4f7edf1803d2.herokuapp.com/check-email', {
+                    email: email,
+                    csrf: csrf,
+                    shash: shash
+                });
+
+                const filteredEmails = response.data.filter(email =>
+                    email.title.includes("Your Netflix temporary access code") ||
+                    email.title.includes("Kode akses sementara Netflix Anda")
+                );
+
+                if (filteredEmails.length > 0) {
+                    filteredEmails.forEach(email => {
+                        const tempDiv = document.createElement('div');
+                        tempDiv.innerHTML = email.content;
+                        const unwantedElement = tempDiv.querySelector('.print_none');
+                        if (unwantedElement) {
+                            unwantedElement.remove();
+                        }
+                        email.content = tempDiv.innerHTML;
+
+                        resultsDiv.appendChild(displayEmail(email));
+                    });
+                } else {
+                    resultsDiv.innerHTML = '<p class="text-center text-gray-400">No Netflix temporary access code emails found.</p>';
+                }
+            } catch (error) {
+                showAlert(`Error: ${error.message}`);
+            } finally {
+                showLoading(false);
+            }
+        });
+    </script>
+</body>
+
+</html>
